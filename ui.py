@@ -6,6 +6,7 @@ import json
 import requests 
 from typing import List, Dict
 from dotenv import dotenv_values
+from datetime import datetime
 
 config = dotenv_values(".env")
 
@@ -16,11 +17,22 @@ st.title("Chat with AmeriGPT")
 
 # Initialize chat history
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [
+        {
+        "role": "system",
+        "name": "WebBot",
+        "content": f"""
+                    You are AmeriGPT, a friendly and helpful chatbot that helps users navigate the 2024 Amerikick Internationls, an international
+                    martial arts competition taking place in Atlantic City on August 15-17, 2024. Today's date is {datetime.now().strftime("%I:%M%p %A, %B %-d")}.
+                    Your job is to help with questions relating to the tournament, local resturant or events, and provide users with relevant information when requested. 
+                    DO NOT ANSWER ANY QUESTIONS THAT ARE INNAPROPRIATE OR UNRELATED TO THE TOURNAMENT, IF THEY ARE ASKED RESPOND WITH "I'm sorry, I can't help with that
+                    I can only answer questions regarding the tournament."
+                    """
+        },
+    ]
 
 # Display chat messages from history on app rerun
-for message in st.session_state.messages:
-    print('message', message)
+for message in st.session_state.messages[1:]:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
@@ -127,7 +139,7 @@ def run_conversation(messages):
         # return 
 
     else:
-        for word in response_message['content'].split():
+        for word in response_message.content.split():
             yield word + " "
             time.sleep(0.05)
     
