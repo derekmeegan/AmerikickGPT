@@ -1,13 +1,11 @@
 import streamlit as st
-import random
-import time
-from openai import AsyncOpenAI, OpenAI
+from openai import OpenAI
 import json
 import requests 
 from typing import List, Dict
 from dotenv import dotenv_values
 from datetime import datetime
-import asyncio
+from PyPDF2 import PdfReader
 
 config = dotenv_values(".env")
 
@@ -37,6 +35,13 @@ if "messages" not in st.session_state:
 for message in st.session_state.messages[1:]:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
+
+def get_rules():
+    reader = PdfReader("output.pdf")
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text()
+    return text
 
 # Function to call restaurants API
 def get_place(
@@ -96,6 +101,18 @@ def run_conversation(messages):
                         },
                     },
                     "required": ["keyword"],
+                },
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_rules",
+                "description": "Get ruleset for the tournament and North American Sport Karate Association.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
                 },
             }
         }
@@ -182,14 +199,23 @@ def run_conversation(messages):
     if is_tool_resp:
         available_functions = {
             "get_place": get_place,
+            "get_rules": get_rules
         }
 
         function_to_call = available_functions[function_name]
+
         function_args = json.loads(tool_resp)
-        function_response = function_to_call(
-            type=function_args.get("type"),
-            keyword=function_args.get("keyword"),
-        )
+        function_response = None
+        if function_name == 'get_place':
+            function_response = function_to_call(
+                type=function_args.get("type"),
+                keyword=function_args.get("keyword"),
+            )
+        elif function_name == 'get_rules':
+            function_response = function_to_call()
+
+        function_response = function_to_call()
+
         print(f'calling {function_to_call} with {function_args}')
         current_messages.append(
             {
@@ -200,6 +226,7 @@ def run_conversation(messages):
             }
         )  # extend conversation with function response
 
+        # print(current_messages)
         second_response = client.chat.completions.create(
             model="gpt-4o",
             messages=current_messages,
