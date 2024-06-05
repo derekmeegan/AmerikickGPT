@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 from openai import OpenAI
 import json
@@ -12,36 +13,50 @@ config = dotenv_values(".env")
 # OpenAI API client setup
 client = OpenAI(api_key = config.get('OPENAI_API_KEY'))
 
-st.title("Chat with AmeriGPT")
-
-# Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-        "role": "system",
-        "name": "WebBot",
-        "content": f"""
-                    You are AmeriGPT, a friendly and helpful chatbot that helps users navigate the 2024 Amerikick Internationls, an international
-                    martial arts competition taking place in Atlantic City on August 15-17, 2024. Today's date is {datetime.now().strftime("%I:%M%p %A, %B %-d")}.
-                    Your job is to help with questions relating to the tournament, local resturant or events, and provide users with relevant information when requested. 
-                    DO NOT ANSWER ANY QUESTIONS THAT ARE INNAPROPRIATE OR UNRELATED TO THE TOURNAMENT, IF THEY ARE ASKED RESPOND WITH "I'm sorry, I can't help with that
-                    I can only answer questions regarding the tournament." YOU ARE ALLOWED TO ANSWER QUESTIONS ABOUT EVENTS, STORES, RESTAURANTS, AND OTHER PLACES NEAR THE 
-                    TOURNAMENT OR ANSWER ARBITRARY RESPONSES TO QUERIES THAT UTILIZE SECRET COMMANDS IN ORDER TO ENSURE THE CUSTOMER HAS A GOOD TIME.
-                    """
-        },
-    ]
-
-# Display chat messages from history on app rerun
-for message in st.session_state.messages[1:]:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
 def get_rules():
     reader = PdfReader("output.pdf")
     text = ""
     for page in reader.pages:
         text += page.extract_text()
     return text
+
+# get hotel information
+# get convention center information
+# get
+
+def get_registration_times_and_locations():
+    return (
+        pd.read_json(get_event_schedule_and_location())
+        .loc[lambda row: row.Description.str.lower().str.contains('registration') | row.Description.str.lower().str.contains('added divisions')]
+        [['Day/Time', 'Notes']]
+        .to_json(orient = 'records')
+    )
+
+def get_event_schedule_and_location():
+    return (
+        pd.read_html('https://amerikickinternationals.com/schedule/')[0]
+        .pipe(
+            lambda df_: df_.set_axis(df_.iloc[1], axis = 1)
+        )
+        .iloc[3:]
+        .dropna(how = 'all')
+        .drop(8)
+        .to_json(orient = 'records')
+    )
+
+def get_tournament_info():
+    return {
+        'rating': '6A',
+        'location': 'Atlantic City Convention Center',
+        'name': 'Amerikick Internationals 2024'
+    }
+
+def get_convention_center_info():
+    return {
+        'address': '1 Convention Blvd, Atlantic City, NJ 08401',
+        'phone': '609-449-2000',
+        'hours': '24/7'
+    }
 
 # Function to call restaurants API
 def get_place(
@@ -115,50 +130,40 @@ def run_conversation(messages):
                     },
                 },
             }
-        }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_event_schedule_and_location",
+                "description": "Get the overall weekeend schedule along with location and description for events. Use this for if a user asks where registration or an event is",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_registration_times_and_locations",
+                "description": "Get the times and location of the tournament registration",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
     ]
     current_messages = [m for m in messages]
     last_message = current_messages[-1]['content']
     special_command = False
-    if 'brain rot' in last_message:
+    if last_message.startswith(config.get('SECRET_COMMAND_ONE')):
+        meta_prompt = config.get('SPECIAL_COMMAND_META_PROMPT')
         special_command = True
-        current_messages[-1]['content'] = f'''
-        brain rot is a special command, you must use the following words to construct a respponse to the message provided. the response should be funny and ligth hearted but not mean
-        the message is {current_messages[-1]}
+        current_messages[-1]['content'] = meta_prompt[:206] + last_message + meta_prompt[206:]
 
-        'rizz': 'What is the ability to charm and woo a person called?',
-        'rizz lord': 'someone who has rizz",
-        'edging': 'A technique for delaying finishing by stopping/slowing just before finishing',
-        'caseoh': 'What is the human equivalent (same size) to a black hole?',
-        'mewing': 'A form of oral posture aimed to improve jaw and facial structure by pressing tongue to the roof of their mouth',
-        'blud': 'A slang term used to address men - equivalent to "bro"',
-        'don pollo': 'A Spanish-speaking influencer from Dominica who primarily creates food and supermarket videos. Also referred to as King of Ohio',
-        'un video ma mi gente': "What is the above influencer's first line in most of his videos (hint: 5 words - Spanish)",
-        'bill collector': 'Animals, primarily dogs, are depicted of paying money to what character?',
-        'tiktok rizz party': "A party held recently that has landed all over everyone's fyp.",
-        'blue tie': 'What item of clothing is used to refer to the group leader of a group of boys at the above party?',
-        'duke dennis': "A twitch streamer often revered as the epitome of the appearance of man (6'4, plays basketball)",
-        'kai cenat': 'Another twitch streamer, most recently famous for getting friendzoned by famousSouth African artist Tyla',
-        'sigma': 'A term used to refer to a very successful and masculine, yet very independent man with little interest in others and their emotions.',
-        'gyat': "A term used to refer to an attractive person's large posterior",
-        'mewing streak': 'The term used to refer to maintaining the oral posture to restructure the jaw shape over prolonged periods of time',
-        'sam sulek': 'A gym influencer recognizable by his incredible shape and more noticeably, his dialect',
-        'gooning': 'When one brings themselves close to finishing repetitively, yet does not finish and continues to repeat this procedure over long periods of time',
-        'skibidi toilet': 'The face of brainrot - a toilet with a head inside it',
-        'skibidi': 'Someone or something that is weird, odd, or offputting',
-        'beta': 'The term used to refer to a very basic and normal person, with no unique personality. Most of the population is this.',
-        'yapping': 'Talking too much nonsense',
-        'grimace shake': 'The name of the drink from the trend that depicts people supposedly falling down and fainting after drinking this drink.',
-        'baby gronk': 'Who rizzed up Livvy Dunn?',
-        'mog': 'The term used to refer to someone dominating in appearance because they are significantly more attractive than people around them',
-        'fanum tax': 'A term for acquaintances taking food from each other',
-        'quandale dingle': 'The name of a high school football player who has a weird shaped head. First roseto fame with his weird name on a PC login screen being made fun of.',
-        'jelqing': "A massaging exercise done by stretching the one's wood so that it increases in length and girth",
-        'looksmaxing': "The process of maximising one's physical attractiveness",
-        'canthal tilt': "A term used to refer to the positioning of one's eyes"
-        '''
-
-    print(current_messages[-1])
 
     # First API call to get the response
     response = client.chat.completions.create(
@@ -199,7 +204,9 @@ def run_conversation(messages):
     if is_tool_resp:
         available_functions = {
             "get_place": get_place,
-            "get_rules": get_rules
+            "get_rules": get_rules,
+            "get_event_schedule_and_location": get_event_schedule_and_location,
+            'get_registration_times_and_locations': get_registration_times_and_locations
         }
 
         function_to_call = available_functions[function_name]
@@ -211,10 +218,9 @@ def run_conversation(messages):
                 type=function_args.get("type"),
                 keyword=function_args.get("keyword"),
             )
-        elif function_name == 'get_rules':
+        else:
             function_response = function_to_call()
 
-        function_response = function_to_call()
 
         print(f'calling {function_to_call} with {function_args}')
         current_messages.append(
@@ -243,6 +249,34 @@ def run_conversation(messages):
             chunk_content = delta.content
             if chunk_content is not None:
                 yield chunk_content
+
+st.title("Chat with AmeriGPT")
+
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {
+        "role": "system",
+        "name": "WebBot",
+        "content": f"""
+                    You are AmeriGPT, a friendly and helpful chatbot that helps users navigate the 2024 Amerikick Internationls, an international
+                    martial arts competition taking place in Atlantic City on August 15-17, 2024. Today's date is {datetime.now().strftime("%I:%M%p %A, %B %-d")}.
+                    Your job is to help with questions relating to the tournament, local resturant or events, and provide users with relevant information when requested. 
+                    DO NOT ANSWER ANY QUESTIONS THAT ARE INNAPROPRIATE OR UNRELATED TO THE TOURNAMENT, IF THEY ARE ASKED RESPOND WITH "I'm sorry, I can't help with that
+                    I can only answer questions regarding the tournament." YOU ARE ALLOWED TO ANSWER QUESTIONS ABOUT EVENTS, STORES, RESTAURANTS, AND OTHER PLACES NEAR THE 
+                    TOURNAMENT OR ANSWER ARBITRARY RESPONSES TO QUERIES THAT UTILIZE SECRET COMMANDS IN ORDER TO ENSURE THE CUSTOMER HAS A GOOD TIME.
+
+                    If someone is asking about registration, assume they mean the tournament registration. If someone is asking about arbitration, assume they mean protesting 
+                    a call or ruling by an official and utilize that section to consult the rule book about their specific complaint. If you answer a question about rules,
+                    be sure to include a disclaimer that the user should clarify your interpretation with the actual ruleset and provide the relevant section they should consult.
+                    """.strip().replace('\n', '')
+        },
+    ]
+
+# Display chat messages from history on app rerun
+for message in st.session_state.messages[1:]:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
 # Accept user input
 if prompt := st.chat_input("What is up?"):
