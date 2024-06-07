@@ -40,12 +40,18 @@ def get_promoters():
     '''
 
 def get_registration_times_and_locations():
-    return (
+    registration_data = (
         pd.read_json(get_event_schedule_and_location())
         .loc[lambda row: row.Description.str.lower().str.contains('registration') | row.Description.str.lower().str.contains('added divisions')]
         [['Day/Time', 'Notes']]
         .to_json(orient = 'records')
     )
+    return f'''
+    if the user wants to pick up their registration or register in person, they can do so at the following locations and times:
+    {registration_data}
+
+    additionally, let them know they can register online and provide this link: https://www.myuventex.com/#login;id=331363;eventType=SuperEvent
+    '''
 
 def get_event_schedule_and_location():
     return (
