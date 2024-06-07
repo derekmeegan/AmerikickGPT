@@ -4,13 +4,11 @@ from openai import OpenAI
 import json
 import requests 
 from typing import List, Dict
-from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from PyPDF2 import PdfReader
 import gspread
 import os
 from sheet import sheet
-load_dotenv()
 
 # OpenAI API client setup
 openai_client = OpenAI(api_key = os.environ.get('OPENAI_API_KEY'))
