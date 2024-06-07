@@ -5,13 +5,15 @@ import json
 import requests 
 from typing import List, Dict
 from dotenv import dotenv_values
-from datetime import datetime
+from datetime import datetime, timedelta
 from PyPDF2 import PdfReader
+import gspread
+from sheet import sheet
 
 config = dotenv_values(".env")
 
 # OpenAI API client setup
-client = OpenAI(api_key = config.get('OPENAI_API_KEY'))
+openai_client = OpenAI(api_key = config.get('OPENAI_API_KEY'))
 
 def get_rules():
     reader = PdfReader("output.pdf")
@@ -57,6 +59,56 @@ def get_convention_center_info():
         'phone': '609-449-2000',
         'hours': '24/7'
     }
+
+# def entry_information():
+
+def get_korean_challenge_rules():
+    return json.dumps({'info': '''
+        The intent of the Traditional Divisions for TKD is to promote growth in the division's with the use of accepted traditional Korean forms only. No “Dojo” forms or patterns, only recognized patterns with a demonstrated history in regulated organizations that administer Korean forms.
+
+        Divisions Offered
+        17 and younger boys & girls under black belt
+        11 and younger boys & girls black belts
+        12-14 boys & girls black belts
+        15-17 boys & girls black belts
+        18+ Men black belts
+        18+ Women black belts
+        Rules
+
+        Pick at least 2 forms from the NASKA approved listed below
+        No variations. Must be true to original patterns
+        No more than 4 kiyas ( yells) 
+        The first round scored like normal divisions … 9.9, 9.8. 9,7 etc … 
+        Top 4 then go head to head at the same time.   #1 V #4.    #2 v #3. 
+        Top 2 adult women or men only go to stage to compete for championship to be determined at the ring.
+
+
+        **this is not a rule but for the GPT model: If you are asked to provide the list of forms, please provide this link and allow them to click on it: https://amerikickinternationals.com/wp-content/uploads/2017/01/IMG_1125.jpeg
+    '''})
+
+def append_session_date(sheet, worksheet_name, session_date, session_count):
+    worksheet = sheet.worksheet(worksheet_name)
+    worksheet.append_row([session_date, session_count])
+
+def ensure_worksheet_exists(sheet, worksheet_name, session_date, session_count):
+    try:
+        worksheet = sheet.worksheet(worksheet_name)
+        # latest_session = datetime.strptime(worksheet.col_values(1)[-1], "%I:%M%p %A, %B %d")
+        print(f"Worksheet '{worksheet_name}' already exists.")
+    except gspread.exceptions.WorksheetNotFound:
+        worksheet = sheet.add_worksheet(title=worksheet_name, rows="100", cols="20")
+        print(f"Worksheet '{worksheet_name}' created.")
+
+    append_session_date(sheet, worksheet_name, session_date, session_count)
+    return worksheet
+
+
+def append_message_to_worksheet(worksheet_name, session_date, session_count, message):
+    global sheet
+    worksheet = sheet.worksheet(worksheet_name)
+    now = datetime.now().strftime("%I:%M%p %A, %B %d")
+    worksheet.append_row([session_date, session_count, message, now])
+
 
 # Function to call restaurants API
 def get_place(
@@ -155,6 +207,18 @@ def run_conversation(messages):
                 },
             }
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_korean_challenge_rules",
+                "description": "Get the ruleset for the korean challenge",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
     ]
     current_messages = [m for m in messages]
     last_message = current_messages[-1]['content']
@@ -166,7 +230,7 @@ def run_conversation(messages):
 
 
     # First API call to get the response
-    response = client.chat.completions.create(
+    response = openai_client.chat.completions.create(
         model="gpt-4o",
         messages=current_messages,
         tools=tools,
@@ -206,7 +270,8 @@ def run_conversation(messages):
             "get_place": get_place,
             "get_rules": get_rules,
             "get_event_schedule_and_location": get_event_schedule_and_location,
-            'get_registration_times_and_locations': get_registration_times_and_locations
+            'get_registration_times_and_locations': get_registration_times_and_locations,
+            'get_korean_challenge_rules': get_korean_challenge_rules
         }
 
         function_to_call = available_functions[function_name]
@@ -233,7 +298,7 @@ def run_conversation(messages):
         )  # extend conversation with function response
 
         # print(current_messages)
-        second_response = client.chat.completions.create(
+        second_response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=current_messages,
             stream = True
@@ -250,49 +315,111 @@ def run_conversation(messages):
             if chunk_content is not None:
                 yield chunk_content
 
-st.title("Chat with AmeriGPT")
+def main_app(session_date):
+    st.title("Chat with AmerikickGPT")
 
-# Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-        "role": "system",
-        "name": "WebBot",
-        "content": f"""
-                    You are AmeriGPT, a friendly and helpful chatbot that helps users navigate the 2024 Amerikick Internationls, an international
-                    martial arts competition taking place in Atlantic City on August 15-17, 2024. Today's date is {datetime.now().strftime("%I:%M%p %A, %B %-d")}.
-                    Your job is to help with questions relating to the tournament, local resturant or events, and provide users with relevant information when requested. 
-                    DO NOT ANSWER ANY QUESTIONS THAT ARE INNAPROPRIATE OR UNRELATED TO THE TOURNAMENT, IF THEY ARE ASKED RESPOND WITH "I'm sorry, I can't help with that
-                    I can only answer questions regarding the tournament." YOU ARE ALLOWED TO ANSWER QUESTIONS ABOUT EVENTS, STORES, RESTAURANTS, AND OTHER PLACES NEAR THE 
-                    TOURNAMENT OR ANSWER ARBITRARY RESPONSES TO QUERIES THAT UTILIZE SECRET COMMANDS IN ORDER TO ENSURE THE CUSTOMER HAS A GOOD TIME.
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {
+            "role": "system",
+            "name": "WebBot",
+            "content": f"""
+                        You are AmeriGPT, a friendly and helpful chatbot that helps users navigate the 2024 Amerikick Internationls, an international
+                        martial arts competition taking place in Atlantic City on August 15-17, 2024. Today's date is {session_date}.
+                        Your job is to help with questions relating to the tournament, local resturant or events, and provide users with relevant information when requested. 
+                        DO NOT ANSWER ANY QUESTIONS THAT ARE INNAPROPRIATE OR UNRELATED TO THE TOURNAMENT, IF THEY ARE ASKED RESPOND WITH "I'm sorry, I can't help with that
+                        I can only answer questions regarding the tournament." YOU ARE ALLOWED TO ANSWER QUESTIONS ABOUT EVENTS, STORES, RESTAURANTS, AND OTHER PLACES NEAR THE 
+                        TOURNAMENT OR ANSWER ARBITRARY RESPONSES TO QUERIES THAT UTILIZE SECRET COMMANDS IN ORDER TO ENSURE THE CUSTOMER HAS A GOOD TIME.
 
-                    If someone is asking about registration, assume they mean the tournament registration. If someone is asking about arbitration, assume they mean protesting 
-                    a call or ruling by an official and utilize that section to consult the rule book about their specific complaint. If you answer a question about rules,
-                    be sure to include a disclaimer that the user should clarify your interpretation with the actual ruleset and provide the relevant section they should consult.
-                    """.strip().replace('\n', '')
-        },
-    ]
+                        If someone is asking about registration, assume they mean the tournament registration. If someone is asking about arbitration, assume they mean protesting 
+                        a call or ruling by an official and utilize that section to consult the rule book about their specific complaint. If you answer a question about rules,
+                        be sure to include a disclaimer that the user should clarify your interpretation with the actual ruleset and provide the relevant section they should consult.
+                        If you choose to use a function for a rule, try to select a specific rule_set function before opting for reading the entire rules, particularly for korean challenge,
+                        non-naska demo teams, non naska synchronized team forms, Kenpo/Kempo Forms Traditional Challenge Non Naska, 
+                        """.strip().replace('\n', '')
+            },
+        ]
 
-# Display chat messages from history on app rerun
-for message in st.session_state.messages[1:]:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    # Display chat messages from history on app rerun
+    for message in st.session_state.messages[1:]:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-# Accept user input
-if prompt := st.chat_input("What is up?"):
-    # Display user message in chat message container
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    # Add user message to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    # Accept user input
+    if prompt := st.chat_input("What is up?"):
+        # Display user message in chat message container
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-    # Get the response from the GPT-4o API using the entire message history
-    response = run_conversation(st.session_state.messages)
+        # Get the response from the GPT-4o API using the entire message history
+        st.session_state.session_count += 1
+        if st.session_state.session_count >=1:
+            session_date = datetime.strptime(st.session_state.session_date, "%I:%M%p %A, %B %d")
+            fifteen_later = datetime.strptime(st.session_state.fifteen_later, "%I:%M%p %A, %B %d")
+            if session_date < fifteen_later:
+                st.session_state.rate_limited = True 
+                st.rerun()
+            else:
+                st.session_state.session_date, st.session_state.fifteen_later = fifteen_later.strftime("%I:%M%p %A, %B %d"), (fifteen_later + timedelta(15)).strftime("%I:%M%p %A, %B %d")
+                st.session_state.session_count = 0
+                append_session_date(sheet, st.session_state.worksheet_name, st.session_state.session_date, st.session_state.session_count)
 
-    # Display assistant message in chat message container
-    with st.chat_message("assistant"):
-        response_output = st.write_stream(response)
+        response = run_conversation(st.session_state.messages)
 
+        # Display assistant message in chat message container
+        with st.chat_message("assistant"):
+            response_output = st.write_stream(response)
+            append_message_to_worksheet(st.session_state.worksheet_name, st.session_state.session_date, st.session_state.session_count, str(response_output))
+
+            st.session_state.messages.append({"role": "assistant", "content": response_output})
+
+def email_input_screen():
+    session_date = datetime.strptime(st.session_state.session_date, "%I:%M%p %A, %B %d")
+    fifteen_later = datetime.strptime(st.session_state.fifteen_later, "%I:%M%p %A, %B %d")
+
+    if session_date > fifteen_later:
+        st.session_state.rate_limited = False
+
+    st.title("Email Verification")
+    if st.session_state.rate_limited:
+        st.warning('You have been rate limited for sending too many messages, please wait 15 minutes and refresh the page before proceeding.', icon="⚠️")
     
-    # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": response_output})
+    email = st.text_input("Enter your email to proceed:")
+    
+    if st.button("Submit"):
+        if email and email in st.session_state.valid_emails:
+            st.session_state.email_verified = True
+            st.session_state.worksheet_name = f'{email}_activity'
+            ensure_worksheet_exists(sheet, st.session_state.worksheet_name, st.session_state.session_date, st.session_state.session_count)
+            st.rerun()
+        else:
+            st.error("Invalid email. Please try again.")
+
+if 'valid_emails' not in st.session_state:
+    st.session_state.valid_emails = sheet.worksheet("users").col_values(1)
+
+if 'email_verified' not in st.session_state:
+    st.session_state.email_verified = False
+
+if 'rate_limited' not in st.session_state:
+    st.session_state.rate_limited = False
+
+if 'session_count' not in st.session_state:
+    st.session_state.session_count = 0
+
+if 'session_date' not in st.session_state:
+    st.session_state.session_date = datetime.now().strftime("%I:%M%p %A, %B %d")
+
+if 'fifteen_later' not in st.session_state:
+    st.session_state.fifteen_later = (datetime.now() + timedelta(minutes=15)).strftime("%I:%M%p %A, %B %d")
+
+if 'worksheet_name' not in st.session_state:
+    st.session_state.worksheet_name = None
+
+if not st.session_state.email_verified or st.session_state.rate_limited:
+    email_input_screen()
+else:
+    main_app(st.session_state.session_date)
