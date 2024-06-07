@@ -425,7 +425,7 @@ def email_input_screen():
             st.error("Invalid email. Please try again.")
 
 if 'valid_emails' not in st.session_state:
-    st.session_state.valid_emails = sheet.worksheet("users").col_values(1)
+    st.session_state.valid_emails = sheet.worksheet("users").col_values(1)[1:]
 
 if 'email_verified' not in st.session_state:
     st.session_state.email_verified = False
