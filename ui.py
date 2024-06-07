@@ -354,7 +354,7 @@ def main_app(session_date):
 
         # Get the response from the GPT-4o API using the entire message history
         st.session_state.session_count += 1
-        if st.session_state.session_count >=1:
+        if st.session_state.session_count >=15:
             session_date = datetime.strptime(st.session_state.session_date, "%I:%M%p %A, %B %d")
             fifteen_later = datetime.strptime(st.session_state.fifteen_later, "%I:%M%p %A, %B %d")
             if session_date < fifteen_later:
