@@ -251,7 +251,7 @@ def run_conversation(messages):
     if last_message.startswith(os.environ.get('SECRET_COMMAND_ONE')):
         meta_prompt = os.environ.get('SPECIAL_COMMAND_META_PROMPT')
         special_command = True
-        current_messages[-1]['content'] = meta_prompt[:206] + last_message + meta_prompt[206:]
+        current_messages[-1]['content'] = meta_prompt[:205] + last_message + " " + meta_prompt[205:]
 
 
     # First API call to get the response
