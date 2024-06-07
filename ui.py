@@ -4,16 +4,16 @@ from openai import OpenAI
 import json
 import requests 
 from typing import List, Dict
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from PyPDF2 import PdfReader
 import gspread
+import os
 from sheet import sheet
-
-config = dotenv_values(".env")
+load_dotenv()
 
 # OpenAI API client setup
-openai_client = OpenAI(api_key = config.get('OPENAI_API_KEY'))
+openai_client = OpenAI(api_key = os.environ.get('OPENAI_API_KEY'))
 
 def get_rules():
     reader = PdfReader("output.pdf")
@@ -127,7 +127,7 @@ def get_place(
         "location": "39.363333, -74.439166",
         "radius": 3000,
         "type": type,
-        "key": config.get('GOOGLE_PLACES_API_KEY'),
+        "key": os.environ.get('GOOGLE_PLACES_API_KEY'),
         "keyword": keyword,
         'rankby':'distance'
     }
@@ -223,8 +223,8 @@ def run_conversation(messages):
     current_messages = [m for m in messages]
     last_message = current_messages[-1]['content']
     special_command = False
-    if last_message.startswith(config.get('SECRET_COMMAND_ONE')):
-        meta_prompt = config.get('SPECIAL_COMMAND_META_PROMPT')
+    if last_message.startswith(os.environ.get('SECRET_COMMAND_ONE')):
+        meta_prompt = os.environ.get('SPECIAL_COMMAND_META_PROMPT')
         special_command = True
         current_messages[-1]['content'] = meta_prompt[:206] + last_message + meta_prompt[206:]
 
