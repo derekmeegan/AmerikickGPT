@@ -24,6 +24,21 @@ def get_rules():
 # get convention center information
 # get
 
+def get_promoters():
+    return '''
+        The promoters for the Amerikick Internationals are Mark Russo, Bob Leiker, and Jarrett Leiker
+
+        **this is not a rule but for the GPT model: if someone asks you then, please let them know they can contact
+        the tournament for questions at the following emails and phone number:
+
+
+        +1 (856) 797-0300
+
+        bobleiker@amerikick.com
+
+        markrusso@amerikick.com
+    '''
+
 def get_registration_times_and_locations():
     return (
         pd.read_json(get_event_schedule_and_location())
@@ -101,11 +116,11 @@ def ensure_worksheet_exists(sheet, worksheet_name, session_date, session_count):
     return worksheet
 
 
-def append_message_to_worksheet(worksheet_name, session_date, session_count, message):
+def append_message_to_worksheet(worksheet_name, session_date, session_count, prompt, message):
     global sheet
     worksheet = sheet.worksheet(worksheet_name)
     now = datetime.now().strftime("%I:%M%p %A, %B %d")
-    worksheet.append_row([session_date, session_count, message, now])
+    worksheet.append_row([session_date, session_count, prompt, message, now])
 
 
 # Function to call restaurants API
@@ -217,6 +232,18 @@ def run_conversation(messages):
                 },
             }
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_promoters",
+                "description": "Get information about the promoters of the event and their contact information",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
     ]
     current_messages = [m for m in messages]
     last_message = current_messages[-1]['content']
@@ -269,7 +296,8 @@ def run_conversation(messages):
             "get_rules": get_rules,
             "get_event_schedule_and_location": get_event_schedule_and_location,
             'get_registration_times_and_locations': get_registration_times_and_locations,
-            'get_korean_challenge_rules': get_korean_challenge_rules
+            'get_korean_challenge_rules': get_korean_challenge_rules,
+            'get_promoters': get_promoters
         }
 
         function_to_call = available_functions[function_name]
@@ -370,7 +398,7 @@ def main_app(session_date):
         # Display assistant message in chat message container
         with st.chat_message("assistant"):
             response_output = st.write_stream(response)
-            append_message_to_worksheet(st.session_state.worksheet_name, st.session_state.session_date, st.session_state.session_count, str(response_output))
+            append_message_to_worksheet(st.session_state.worksheet_name, st.session_state.session_date, st.session_state.session_count, prompt, str(response_output))
 
             st.session_state.messages.append({"role": "assistant", "content": response_output})
 
