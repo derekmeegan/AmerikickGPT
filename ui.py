@@ -22,7 +22,9 @@ def get_rules():
 
 # get hotel information
 # get convention center information
-# get
+
+def get_developer_info():
+    return 'The developer of this application is Derek Meegan. He is a technology consultant from Santa Clarita, California. If they would like to contact me or find out more about me, provide them this link to my website: derekmeegan.com'
 
 def get_promoters():
     return '''
@@ -250,6 +252,18 @@ def run_conversation(messages):
                 },
             }
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_developer_info",
+                "description": "Get information about the developer of the application, Derek Meegan",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
     ]
     current_messages = [m for m in messages]
     last_message = current_messages[-1]['content']
@@ -303,7 +317,8 @@ def run_conversation(messages):
             "get_event_schedule_and_location": get_event_schedule_and_location,
             'get_registration_times_and_locations': get_registration_times_and_locations,
             'get_korean_challenge_rules': get_korean_challenge_rules,
-            'get_promoters': get_promoters
+            'get_promoters': get_promoters,
+            "get_developer_info" : get_developer_info
         }
 
         function_to_call = available_functions[function_name]
