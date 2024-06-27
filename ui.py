@@ -110,15 +110,32 @@ def append_session_date(sheet, worksheet_name, session_date, session_count):
     worksheet.append_row([session_date, session_count])
 
 def ensure_worksheet_exists(sheet, worksheet_name, session_date, session_count):
+    new_session = True
     try:
         worksheet = sheet.worksheet(worksheet_name)
-        # latest_session = datetime.strptime(worksheet.col_values(1)[-1], "%I:%M%p %A, %B %d")
+        latest_session = (
+            pd.DataFrame(worksheet.get_all_records())
+            .iloc[-1]
+        )
+        latest_session_time = latest_session.iloc[0]
+        latest_session_count = latest_session.iloc[1]
+
+        last_session = datetime.strptime(latest_session_time, "%I:%M%p %A, %B %d")
+        current_session = datetime.strptime(st.session_state.session_date, "%I:%M%p %A, %B %d")
+        if current_session - timedelta(minutes = 15) < last_session:
+            new_session = False
+            st.session_state.session_date = last_session.strftime("%I:%M%p %A, %B %d")
+            st.session_state.fifteen_later = (last_session + timedelta(minutes = 15)).strftime("%I:%M%p %A, %B %d")
+            st.session_state.session_count = int(latest_session_count)
+
         print(f"Worksheet '{worksheet_name}' already exists.")
     except gspread.exceptions.WorksheetNotFound:
         worksheet = sheet.add_worksheet(title=worksheet_name, rows="100", cols="20")
         print(f"Worksheet '{worksheet_name}' created.")
+        worksheet.append_row(['session_time', 'num_messages', 'user_prompt', 'message', 'time'])
 
-    append_session_date(sheet, worksheet_name, session_date, session_count)
+    if new_session:
+        append_session_date(sheet, worksheet_name, session_date, session_count)
     return worksheet
 
 
