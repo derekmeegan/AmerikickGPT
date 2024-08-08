@@ -1,3 +1,4 @@
+from fuzzywuzzy import process
 import pandas as pd
 import streamlit as st
 from openai import OpenAI
@@ -9,6 +10,7 @@ from PyPDF2 import PdfReader
 import gspread
 import os
 from sheet import sheet
+from io import StringIO
 
 # OpenAI API client setup
 openai_client = OpenAI(api_key = os.environ.get('OPENAI_API_KEY'))
@@ -81,7 +83,67 @@ def get_convention_center_info():
         'hours': '24/7'
     }
 
-# def entry_information():
+def get_all_divisions():
+    division_data = requests.get(os.environ.get('DIVISIONS_ENDPOINT')).text
+    return pd.read_json(StringIO(division_data))
+
+def get_division_info_and_time_by_keywords(
+    division_query_phrase: str = '',
+    age_keyword: str = '',
+    gender_key_word: str = '',
+    rank_key_word: str = '', 
+    division_key_word: str = ''
+):
+    if not division_key_word:
+        division_key_word = ''
+
+    if not age_keyword:
+        age_keyword = ''
+
+    if not gender_key_word:
+        gender_key_word = ''
+
+    if not rank_key_word:
+        rank_key_word = ''
+
+    shortlist = (
+        get_all_divisions()
+        .loc[lambda row: 
+            (row.name.str.lower().str.contains(age_keyword)) & 
+            (row.name.str.lower().str.contains(gender_key_word)) & 
+            (row.name.str.lower().str.contains(division_key_word)) &
+            (row.name.str.lower().str.contains(rank_key_word))
+        ]
+    )
+    relevant_divisions = (
+        shortlist
+        .loc[lambda row: row.name.isin([r[0] for r in process.extract(division_query_phrase, shortlist.name.to_list(), limit=5)])]
+        .to_json(orient = 'records')
+    )
+    
+    return f'''
+    the following divisions were found to be closest to what the user requested. 
+    please provide them with the day, time, and ring number associated with the division closest to what they originally requested.
+    remind them the times are estimated and may change based on completion of prior divisions. if they did not provide all fields,
+    let them know you can provide better results if they provide further detail. if there are no divisions that match the code, let the user know you were not able to find it:
+    {relevant_divisions}
+    '''
+
+def get_division_info_and_time_by_code(
+    division_code: str
+):
+    division = (
+        get_all_divisions()
+        .loc[lambda row: row.division_code.str.lower() == division_code.lower()]
+        .to_json(orient = 'records')
+    )
+    
+    return f'''
+    please provide them with the name, day, time, and ring number associated with the division.
+    remind them the times are estimated and may change based on completion of prior divisions.
+    if there are no divisions that match the code, let the user know you were not able to find it.
+    {division}
+    '''
 
 def get_korean_challenge_rules():
     return json.dumps({'info': '''
@@ -147,8 +209,6 @@ def append_message_to_worksheet(worksheet_name, session_date, session_count, pro
     now = datetime.now().strftime("%I:%M%p %A, %B %d")
     worksheet.append_row([session_date, session_count, prompt, message, now])
 
-
-# Function to call restaurants API
 def get_place(
     type: str,
     keyword: str, 
@@ -184,10 +244,58 @@ def get_place(
 
     return json.dumps(restaurants[:7])
 
-# Function to simulate the GPT-4o conversation and function calls
 def run_conversation(messages):
-    # Tools description
     tools = [
+         {
+            "type": "function",
+            "function": {
+                "name": "get_division_info_and_time_by_code",
+                "description": "Uses divison code to identify division and provide details",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "division_code": {
+                            "type": "string",
+                            "description": "Division code will be consist of letters and numbers and may include a -",
+                        },
+                    },
+                    "required": ["division_code"],
+                },
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_division_info_and_time_by_keywords",
+                "description": "Uses key words to pair down possible divisions and then uses cosine similarity to find the top 5 relevant matches.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "division_query_phrase": {
+                            "type": "string",
+                            "description": "This is the phrase the user provides to identify the division. May be something like '10-11 boys black belt sparring'",
+                        },
+                        "age_keyword": {
+                            "type": "string",
+                            "description": "A particular number denoting one of the ages of the participants. Should be a singular number like 10, 11, 18, or 30 but could be others.",
+                        },
+                        "gender_key_word": {
+                            "type": "string",
+                            "description": "A particular gender like boys, girls, men, women. if multiple genders are specified search along one",
+                        },
+                        "rank_key_word": {
+                            "type": "string",
+                            "description": "Denotes the rank of the division of competition. Something like black, intermediate, advanced, or beginner",
+                        },
+                        "rank_key_word": {
+                            "type": "string",
+                            "description": "Denotes type of division, like sparring, forms, traditional forms, traditional challenge, korean challenge, traditional weapons, cretive weapons, extreme weapons, team sync, demo, etc",
+                        },
+                    },
+                    "required": ["division_query_phrase"],
+                },
+            }
+        },
         {
             "type": "function",
             "function": {
@@ -335,7 +443,9 @@ def run_conversation(messages):
             'get_registration_times_and_locations': get_registration_times_and_locations,
             'get_korean_challenge_rules': get_korean_challenge_rules,
             'get_promoters': get_promoters,
-            "get_developer_info" : get_developer_info
+            "get_developer_info" : get_developer_info,
+            'get_division_info_and_time_by_keywords': get_division_info_and_time_by_keywords,
+            'get_division_info_and_time_by_code': get_division_info_and_time_by_code
         }
 
         function_to_call = available_functions[function_name]
@@ -347,9 +457,20 @@ def run_conversation(messages):
                 type=function_args.get("type"),
                 keyword=function_args.get("keyword"),
             )
+        elif function_name == 'get_division_info_and_time_by_keywords':
+            function_response = function_to_call(
+                division_query_phrase = function_args.get("division_query_phrase"),
+                age_keyword = function_args.get("age_keyword"),
+                gender_key_word = function_args.get("gender_key_word"),
+                rank_key_word = function_args.get("rank_key_word"),
+                division_key_word = function_args.get("division_key_word"),
+            )
+        elif function_name == 'get_division_info_and_time_by_code':
+            function_response = function_to_call(
+                division_code = function_args.get("division_code"),
+            )
         else:
             function_response = function_to_call()
-
 
         print(f'calling {function_to_call} with {function_args}')
         current_messages.append(
@@ -361,13 +482,11 @@ def run_conversation(messages):
             }
         )  # extend conversation with function response
 
-        # print(current_messages)
         second_response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=current_messages,
             stream = True
         )  # get a new response from the model where it can see the function response
-        print('returning second response')
 
         if special_command:
             current_messages[-2]['content'] = last_message

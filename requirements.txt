@@ -7,3 +7,4 @@ openai==1.30.3
 gspread==6.1.2
 python-dotenv==0.15.0
 lxml==5.2.2
+selenium==4.22.0
