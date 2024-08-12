@@ -11,16 +11,60 @@ import gspread
 import os
 from sheet import sheet
 from io import StringIO
+import re
+from typing import List
+
+def find_sections(text: str) -> List[str]:
+    # Define the regular expression pattern
+    pattern = r'[IVXLCDM]+\.\d{0,2}'
+    
+    # Find all matches in the text
+    matches = re.findall(pattern, text)
+    
+    return matches
 
 # OpenAI API client setup
 openai_client = OpenAI(api_key = os.environ.get('OPENAI_API_KEY'))
 
 def get_rules():
-    reader = PdfReader("output.pdf")
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
+    try:
+        reader = PdfReader("output.pdf")
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text()
+
+        text = re.sub(r"Page \|\s+\d+", "", text)
+
+        pages = requests.get(
+            os.environ.get('RULESET_ENDPOINT')
+            # params = {'section': section}
+        ).text
+        return f'''
+        After your rule interpretation, provide a link like "https://storage.cloud.google.com/naska_rules/rule_book_<section>.pdf?authuser=1#page=<page>" to the highlighted rulebook so the user can click on it if they choose.
+
+        rule book:
+
+        {text}
+
+        Use your interpreation of the rules to select the seciton. which should not include periods, spaces, it should be formatted like VIII2, or IX etc. If applicable, denote the subsection of the rules in the response and link you provide the user. 
+        ONLY SECITON IX HAS NOT SUBSECTIONS, ALL OTHER SECTIONS REQUIRE A SUBSECTION NUMBER IN URL (LIKE V2). DO NOT INCLUDE A PERIOD OR SPACE BETWEEN THE SECTION LETTER AND SUBSECTION NUMBER
+        USE THE JSON BELOW TO SELECT THE PAGE NUMBER. ALL URLS REQUIRE A PAGE NUMBER
+        {pages}
+        '''
+    except Exception as e:
+        print(f'Ruleset broke: {e}')
+        raise
+
+def get_highlighted_ruleset_url(
+    section: str
+):
+    section = section.strip().replace(' ', '').replace('.', '').upper().replace('SECTION', '').replace('(', '').replace(')', '')
+    url = requests.get(
+        os.environ.get('RULESET_ENDPOINT'),
+        params = {'section': section}
+    ).text
+    return url
+
 
 # get hotel information
 # get convention center information
@@ -401,7 +445,7 @@ def run_conversation(messages):
 
     # First API call to get the response
     response = openai_client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=current_messages,
         tools=tools,
         tool_choice="auto",  # auto is default, but we'll be explicit        
@@ -415,13 +459,12 @@ def run_conversation(messages):
     for chunk in response:
         delta = chunk.choices[0].delta
         tool_calls = delta.tool_calls
-        if tool_calls:
-            if tool_calls[0].function.name is not None:
+        if tool_calls and tool_calls[0].function.name is not None:
+            if not is_tool_resp:
                 current_messages.append(delta)
-                function_name = tool_calls[0].function.name
-                tool_call_id = tool_calls[0].id
-                is_tool_resp = True
-            # break
+            function_name = tool_calls[0].function.name
+            tool_call_id = tool_calls[0].id
+            is_tool_resp = True
 
         chunk_content = delta.content
         if chunk_content is not None and not is_tool_resp:
@@ -445,7 +488,7 @@ def run_conversation(messages):
             'get_promoters': get_promoters,
             "get_developer_info" : get_developer_info,
             'get_division_info_and_time_by_keywords': get_division_info_and_time_by_keywords,
-            'get_division_info_and_time_by_code': get_division_info_and_time_by_code
+            'get_division_info_and_time_by_code': get_division_info_and_time_by_code,
         }
 
         function_to_call = available_functions[function_name]
@@ -483,7 +526,7 @@ def run_conversation(messages):
         )  # extend conversation with function response
 
         second_response = openai_client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=current_messages,
             stream = True
         )  # get a new response from the model where it can see the function response
@@ -497,7 +540,7 @@ def run_conversation(messages):
             chunk_content = delta.content
             if chunk_content is not None:
                 yield chunk_content
-
+        
 def main_app(session_date):
     st.title("Chat with AmerikickGPT")
 
@@ -516,7 +559,9 @@ def main_app(session_date):
                         TOURNAMENT OR ANSWER ARBITRARY RESPONSES TO QUERIES THAT UTILIZE SECRET COMMANDS IN ORDER TO ENSURE THE CUSTOMER HAS A GOOD TIME.
 
                         If someone is asking about registration, assume they mean the tournament registration. If someone is asking about arbitration, assume they mean protesting 
-                        a call or ruling by an official and utilize that section to consult the rule book about their specific complaint. If you answer a question about rules,
+                        a call or ruling by an official and utilize that section to consult the rule book about their specific complaint. If a user asks a procedural question or 
+                        clarifying question regarding the tournament's or the league procedure in general, CONSULT THE RULES. DO NOT TRY TO USE YOUR OWN KNOWLEDGE. CONSULT THE RULE
+                        BOOK. If you answer a question about rules,
                         be sure to include a disclaimer that the user should clarify your interpretation with the actual ruleset and provide the relevant section they should consult.
                         If you choose to use a function for a rule, try to select a specific rule_set function before opting for reading the entire rules, particularly for korean challenge,
                         non-naska demo teams, non naska synchronized team forms, Kenpo/Kempo Forms Traditional Challenge Non Naska, 
