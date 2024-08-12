@@ -449,7 +449,8 @@ def run_conversation(messages):
         messages=current_messages,
         tools=tools,
         tool_choice="auto",  # auto is default, but we'll be explicit        
-        stream = True
+        stream = True,
+        temperature=0
     )
 
     tool_resp = ''
@@ -528,7 +529,8 @@ def run_conversation(messages):
         second_response = openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=current_messages,
-            stream = True
+            stream = True,
+            temperature=0
         )  # get a new response from the model where it can see the function response
 
         if special_command:
