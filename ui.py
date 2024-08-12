@@ -26,6 +26,13 @@ def find_sections(text: str) -> List[str]:
 # OpenAI API client setup
 openai_client = OpenAI(api_key = os.environ.get('OPENAI_API_KEY'))
 
+def get_referee_dress_code():
+    return '''
+    Please bring your referee shirt if you already have one. A red or black referee shirt is mandatory. Judges should wear black pants and black sneakers. No hats, jackets, or coats are allowed.
+
+    Please also provide the following quote from Sensei Bob Leiker: "Pretty simple dress code, dress accordingly"
+    '''
+
 def get_rules():
     try:
         reader = PdfReader("output.pdf")
@@ -46,7 +53,7 @@ def get_rules():
 
         {text}
 
-        Use your interpreation of the rules to select the seciton. which should not include periods, spaces, it should be formatted like VIII2, or IX etc. If applicable, denote the subsection of the rules in the response and link you provide the user. 
+        Use your interpreation of the rules to select the seciton. which should not include periods, spaces, it should be formatted like VIII2, or IX etc. If applicable, provide the subsection of the rules to and in the link you provide the user. 
         ONLY SECITON IX HAS NOT SUBSECTIONS, ALL OTHER SECTIONS REQUIRE A SUBSECTION NUMBER IN URL (LIKE V2). DO NOT INCLUDE A PERIOD OR SPACE BETWEEN THE SECTION LETTER AND SUBSECTION NUMBER
         USE THE JSON BELOW TO SELECT THE PAGE NUMBER. ALL URLS REQUIRE A PAGE NUMBER
         {pages}
@@ -64,10 +71,6 @@ def get_highlighted_ruleset_url(
         params = {'section': section}
     ).text
     return url
-
-
-# get hotel information
-# get convention center information
 
 def get_developer_info():
     return 'The developer of this application is Derek Meegan. He is a technology consultant from Santa Clarita, California. If they would like to contact me or find out more about me, provide them this link to my website: derekmeegan.com'
@@ -433,6 +436,18 @@ def run_conversation(messages):
                 },
             }
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_referee_dress_code",
+                "description": "Gets the dress code required for referees.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
     ]
     current_messages = [m for m in messages]
     last_message = current_messages[-1]['content']
@@ -490,6 +505,7 @@ def run_conversation(messages):
             "get_developer_info" : get_developer_info,
             'get_division_info_and_time_by_keywords': get_division_info_and_time_by_keywords,
             'get_division_info_and_time_by_code': get_division_info_and_time_by_code,
+            "get_referee_dress_code": get_referee_dress_code
         }
 
         function_to_call = available_functions[function_name]
@@ -557,7 +573,7 @@ def main_app(session_date):
                         martial arts competition taking place in Atlantic City on August 15-17, 2024. Today's date is {session_date}.
                         Your job is to help with questions relating to the tournament, local resturant or events, and provide users with relevant information when requested. 
                         DO NOT ANSWER ANY QUESTIONS THAT ARE INNAPROPRIATE OR UNRELATED TO THE TOURNAMENT, IF THEY ARE ASKED RESPOND WITH "I'm sorry, I can't help with that
-                        I can only answer questions regarding the tournament." YOU ARE ALLOWED TO ANSWER QUESTIONS ABOUT EVENTS, STORES, RESTAURANTS, AND OTHER PLACES NEAR THE 
+                        I can only answer questions regarding the tournament." YOU ARE ALLOWED TO ANSWER QUESTIONS ABOUT EVENTS, STORES, RESTAURANTS, YOUR DEVELOPER, AND OTHER PLACES NEAR THE 
                         TOURNAMENT OR ANSWER ARBITRARY RESPONSES TO QUERIES THAT UTILIZE SECRET COMMANDS IN ORDER TO ENSURE THE CUSTOMER HAS A GOOD TIME.
 
                         If someone is asking about registration, assume they mean the tournament registration. If someone is asking about arbitration, assume they mean protesting 
