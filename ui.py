@@ -49,7 +49,7 @@ def get_rules():
             # params = {'section': section}
         ).text
         return f'''
-        After your rule interpretation, provide a link like _I1.pdf "https://storage.googleapis.com/naska_rules/rule_book_<section>.pdf#page=<page>" to the highlighted rulebook so the user can click on it if they choose.
+        After your rule interpretation, provide a link like "https://storage.googleapis.com/naska_rules/rule_book_<section>.pdf#page=<page>" to the highlighted rulebook so the user can click on it if they choose.
 
         rule book:
 
