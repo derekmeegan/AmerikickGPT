@@ -12,7 +12,7 @@ import os
 from sheet import sheet
 from io import StringIO
 import re
-from typing import List
+from typing import List 
 
 st.set_page_config(page_title = 'AmerikickGPT')
 
