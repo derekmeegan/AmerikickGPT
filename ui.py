@@ -14,6 +14,8 @@ from io import StringIO
 import re
 from typing import List
 
+st.set_page_config(page_title = 'AmerikickGPT')
+
 def find_sections(text: str) -> List[str]:
     # Define the regular expression pattern
     pattern = r'[IVXLCDM]+\.\d{0,2}'
@@ -92,7 +94,7 @@ def get_promoters():
 
 def get_registration_times_and_locations():
     registration_data = (
-        pd.read_json(get_event_schedule_and_location())
+        pd.read_json(get_overall_weekend_schedule_and_location())
         .loc[lambda row: row.Description.str.lower().str.contains('registration') | row.Description.str.lower().str.contains('added divisions')]
         [['Day/Time', 'Notes']]
         .to_json(orient = 'records')
@@ -104,7 +106,7 @@ def get_registration_times_and_locations():
     additionally, let them know they can register online and provide this link: https://www.myuventex.com/#login;id=331363;eventType=SuperEvent
     '''
 
-def get_event_schedule_and_location():
+def get_overall_weekend_schedule_and_location():
     return (
         pd.read_html('https://amerikickinternationals.com/schedule/')[0]
         .pipe(
@@ -379,7 +381,7 @@ def run_conversation(messages):
         {
             "type": "function",
             "function": {
-                "name": "get_event_schedule_and_location",
+                "name": "get_overall_weekend_schedule_and_location",
                 "description": "Get the overall weekeend schedule along with location and description for events. Use this for if a user asks where registration or an event is",
                 "parameters": {
                     "type": "object",
@@ -498,7 +500,7 @@ def run_conversation(messages):
         available_functions = {
             "get_place": get_place,
             "get_rules": get_rules,
-            "get_event_schedule_and_location": get_event_schedule_and_location,
+            "get_overall_weekend_schedule_and_location": get_overall_weekend_schedule_and_location,
             'get_registration_times_and_locations': get_registration_times_and_locations,
             'get_korean_challenge_rules': get_korean_challenge_rules,
             'get_promoters': get_promoters,
