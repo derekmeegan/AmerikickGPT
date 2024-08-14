@@ -705,3 +705,8 @@ if not st.session_state.email_verified or st.session_state.rate_limited:
     email_input_screen()
 else:
     main_app(st.session_state.session_date)
+
+hide_github_icon = """
+
+"""
+st.markdown(hide_github_icon, unsafe_allow_html=True)
