@@ -64,6 +64,21 @@ def get_rules():
         print(f'Ruleset broke: {e}')
         raise
 
+def get_judging_or_scorekeeper_assignment():
+    email = st.session_state.email
+    result = requests.get(
+        os.environ.get('JUDGING_ENDPOINT'),
+        params = {'email': email}
+    ).text
+
+    if result == "account not found":
+        return 'Let the user know that their assignment was not found. If they believe this is a mistake, then they should reach out to derekmeegan@gmail.com or an event coordinator to verify their assignment.'
+    
+    return f'''
+    the users judging or scorekeeper asignment is as the following. they could be either be a judge or scorekeeper so just say it is their assignment.
+    {result}
+    '''
+
 def get_highlighted_ruleset_url(
     section: str
 ):
@@ -295,7 +310,19 @@ def get_place(
 
 def run_conversation(messages):
     tools = [
-         {
+        {
+            "type": "function",
+            "function": {
+                "name": "get_judging_or_scorekeeper_assignment",
+                "description": "Provides the judging or scorekeeper assignment for the current user. User could be either a judge or scorekeeper.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
+        {
             "type": "function",
             "function": {
                 "name": "get_division_info_and_time_by_code",
@@ -507,7 +534,8 @@ def run_conversation(messages):
             "get_developer_info" : get_developer_info,
             'get_division_info_and_time_by_keywords': get_division_info_and_time_by_keywords,
             'get_division_info_and_time_by_code': get_division_info_and_time_by_code,
-            "get_referee_dress_code": get_referee_dress_code
+            "get_referee_dress_code": get_referee_dress_code,
+            'get_judging_or_scorekeeper_assignment': get_judging_or_scorekeeper_assignment
         }
 
         function_to_call = available_functions[function_name]
@@ -575,7 +603,7 @@ def main_app(session_date):
                         martial arts competition taking place in Atlantic City on August 15-17, 2024. Today's date is {session_date}.
                         Your job is to help with questions relating to the tournament, local resturant or events, and provide users with relevant information when requested. 
                         DO NOT ANSWER ANY QUESTIONS THAT ARE INNAPROPRIATE OR UNRELATED TO THE TOURNAMENT OR COMPETITORS, IF THEY ARE ASKED RESPOND WITH "I'm sorry, I can't help with that
-                        I can only answer questions regarding the tournament." YOU ARE ALLOWED TO ANSWER QUESTIONS ABOUT EVENTS, STORES, RESTAURANTS, YOUR DEVELOPER, COMPETITORS, REFEREES,
+                        I can only answer questions regarding the tournament." YOU ARE ALLOWED TO ANSWER QUESTIONS ABOUT EVENTS, STORES, RESTAURANTS, YOUR DEVELOPER, COMPETITORS, REFEREES/JUDGES,
                         AND OTHER PLACES NEAR THE TOURNAMENT OR ANSWER ARBITRARY RESPONSES TO QUERIES THAT UTILIZE SECRET COMMANDS IN ORDER TO ENSURE THE CUSTOMER HAS A GOOD TIME.
 
                         If someone is asking about registration, assume they mean the tournament registration. If someone is asking about arbitration, assume they mean protesting 
@@ -584,7 +612,9 @@ def main_app(session_date):
                         BOOK. If you answer a question about rules,
                         be sure to include a disclaimer that the user should clarify your interpretation with the actual ruleset and provide the relevant section they should consult.
                         If you choose to use a function for a rule, try to select a specific rule_set function before opting for reading the entire rules, particularly for korean challenge,
-                        non-naska demo teams, non naska synchronized team forms, Kenpo/Kempo Forms Traditional Challenge Non Naska, 
+                        non-naska demo teams, non naska synchronized team forms, Kenpo/Kempo Forms Traditional Challenge Non Naska.
+
+                        if someone asks about a scorekeeper or judging assignment that is not about themself, let them know they cannot do that.
                         """.strip().replace('\n', '')
             },
         ]
@@ -639,6 +669,7 @@ def email_input_screen():
     
     if st.button("Submit"):
         if email and email in st.session_state.valid_emails:
+            st.session_state.email = email
             st.session_state.email_verified = True
             st.session_state.worksheet_name = f'{email}_activity'
             ensure_worksheet_exists(sheet, st.session_state.worksheet_name, st.session_state.session_date, st.session_state.session_count)
@@ -651,6 +682,9 @@ if 'valid_emails' not in st.session_state:
 
 if 'email_verified' not in st.session_state:
     st.session_state.email_verified = False
+
+if 'email' not in st.session_state:
+    st.session_state.email = False
 
 if 'rate_limited' not in st.session_state:
     st.session_state.rate_limited = False
