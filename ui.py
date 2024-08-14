@@ -15,6 +15,13 @@ import re
 from typing import List 
 
 st.set_page_config(page_title = 'AmerikickGPT')
+hide_github_icon = """<style>
+#MainMenu {
+  visibility: hidden;
+}
+</style>
+"""
+st.markdown(hide_github_icon, unsafe_allow_html=True)
 
 def find_sections(text: str) -> List[str]:
     # Define the regular expression pattern
@@ -705,8 +712,3 @@ if not st.session_state.email_verified or st.session_state.rate_limited:
     email_input_screen()
 else:
     main_app(st.session_state.session_date)
-
-hide_github_icon = """
-
-"""
-st.markdown(hide_github_icon, unsafe_allow_html=True)
