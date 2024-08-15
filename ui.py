@@ -118,19 +118,20 @@ def get_tournament_address():
     The convention center is at 1 Convention Boulevard, Atlantic City, NJ 08401 and the Sheraton Atlantic City, 
     the tournament hotel, is at Two Convention Boulevard, 2 Convention Blvd, Atlantic City, NJ 08401
 
-    also include the following information on parking: {get_parking_information}
+    also include the following information on parking: {get_parking_information()}
     """
 
 def get_parking_information():
     return """
     The two options for parking are:
 
-    Parking at the Convention Center Parking Garage $20
-    You can park at the Atlantic City Convention Center for $20 per day.  Parking is safe and monitored.  You can access the convention center easily to Hall B.  For more parking information click here
+    Paring at the convention center parking garage for 20 dollars per day. You can accesss convention center through Hall B from the parking lot
 
-    Parking at the Sheraton Hotel
-    If you are staying at the Sheraton Hotel parking is available for $20 per day for self park and $30 per day for valet parking
+    Parking at the Sheraton hotel, which is 20 dollars per day for self park or 30 dollars per day for valet.
+
+    Provide the options as distinct bullets
     """
+
 def get_highlighted_ruleset_url(
     section: str
 ):
