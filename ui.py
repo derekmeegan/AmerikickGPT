@@ -342,14 +342,15 @@ def get_division_info_and_time_by_keywords(division_query_phrase: str):
 def get_division_info_and_time_by_code(
     division_code: str
 ):
+    division_code = division_code.replace('-', '')
     division = (
         get_all_divisions()
-        .loc[lambda row: row.division_code.str.lower() == division_code.lower()]
+        .loc[lambda row: row.division_code.str.replace('-', '', regex = False).str.lower() == division_code.lower()]
         .to_json(orient = 'records')
     )
     
     return f'''
-    please provide them with the name, day, time, and ring number associated with the division.
+    YOU MUST provide them with the FULL DIVISION NAME, DAY, TIME, and RING NUMBER associated with the division.
     remind them the times are estimated and may change based on completion of prior divisions.
     if there are no divisions that match the code, let the user know you were not able to find it.
     {division}
