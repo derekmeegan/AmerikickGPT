@@ -100,14 +100,37 @@ def get_judging_or_scorekeeper_assignment():
     {result}
     '''
 
-# def get_dragonism():
-#     dragonisms = [
-#         'skibidi',
-#         'hungry dogs run fast',
-#         'push',
-#         ''
-#     ]
+def get_dragonism():
+    dragonisms = [
+        'skibidi',
+        'hungry dogs run fast',
+        'push',
+        'sick nasty',
 
+    ]
+
+def get_tournament_website():
+    return "Provide the following clickable link: https://amerikickinternationals.com/"
+
+
+def get_tournament_address():
+    return f"""
+    The convention center is at 1 Convention Boulevard, Atlantic City, NJ 08401 and the Sheraton Atlantic City, 
+    the tournament hotel, is at Two Convention Boulevard, 2 Convention Blvd, Atlantic City, NJ 08401
+
+    also include the following information on parking: {get_parking_information}
+    """
+
+def get_parking_information():
+    return """
+    The two options for parking are:
+
+    Parking at the Convention Center Parking Garage $20
+    You can park at the Atlantic City Convention Center for $20 per day.  Parking is safe and monitored.  You can access the convention center easily to Hall B.  For more parking information click here
+
+    Parking at the Sheraton Hotel
+    If you are staying at the Sheraton Hotel parking is available for $20 per day for self park and $30 per day for valet parking
+    """
 def get_highlighted_ruleset_url(
     section: str
 ):
