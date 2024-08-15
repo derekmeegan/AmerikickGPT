@@ -100,6 +100,14 @@ def get_judging_or_scorekeeper_assignment():
     {result}
     '''
 
+# def get_dragonism():
+#     dragonisms = [
+#         'skibidi',
+#         'hungry dogs run fast',
+#         'push',
+#         ''
+#     ]
+
 def get_highlighted_ruleset_url(
     section: str
 ):
@@ -188,7 +196,7 @@ def get_ring_start_time(ring: str, day: str = "friday") -> str:
         }
         start_time = requests.get(os.environ.get('RING_ENDPOINT'), params=params).text
         return f"""
-        The following start time was identified. if the start time was not found, let the user know. 
+        The following start time was identified. if the start time was not found, let the user know. make sure to include in at the end of your response on its own line that this feature is powered by Uventex
         Please reiterate the day and time in your response. Use the words Friday or Saturday explicitly and make sure to include am or pm
         {start_time}
         """
@@ -304,7 +312,7 @@ def get_division_info_and_time_by_keywords(division_query_phrase: str):
     Please provide them with the day, time, and ring number associated with the division closest to what they originally requested.
     If there are several divisions that are very, very similar, then provide information for all of those divisions.
     Remind them the times are estimated and may change based on completion of prior divisions. If they did not provide all fields,
-    let them know you can provide better results if they provide further detail.
+    let them know you can provide better results if they provide further detail. make sure to include in at the end of your response on its own line that this feature is powered by Uventex
     '''
 
 def get_division_info_and_time_by_code(
