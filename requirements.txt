@@ -9,3 +9,4 @@ python-dotenv==0.15.0
 lxml==5.2.2
 selenium==4.22.0
 fuzzywuzzy==0.18.0
+Whoosh==2.7.4
