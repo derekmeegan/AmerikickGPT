@@ -267,7 +267,7 @@ def get_division_info_and_time_by_keywords(division_query_phrase: str):
     global ix  # Use the global variable for the index
 
     division_query_phrase = division_query_phrase.lower()
-    if 'korean challenge' in division_query_phrase:
+    if 'korean challenge' in division_query_phrase or 'traditional challenge' in division_query_phrase:
         division_query_phrase = division_query_phrase.replace('and under', '')
 
     if 'cmx' in division_query_phrase:
