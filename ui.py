@@ -264,9 +264,6 @@ def get_division_info_and_time_by_keywords(division_query_phrase: str):
             "division_indexdir",
             (
                 get_all_divisions()
-                .assign(
-                    name = lambda df_: df_.name.str.replace('Class AA', '', regex = False)
-                )
                 .fillna('unknown')
             )
         )
