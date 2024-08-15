@@ -13,8 +13,7 @@ from sheet import sheet
 from io import StringIO
 import re
 from typing import List 
-# import shutil
-
+import traceback
 from whoosh.index import create_in, open_dir
 from whoosh.fields import Schema, TEXT, ID, STORED
 from whoosh.qparser import QueryParser
@@ -164,85 +163,38 @@ def get_convention_center_info():
         'hours': '24/7'
     }
 
+def get_ring_start_time(ring: str, day: str = "friday") -> str:
+    day = str(day).lower()
+    try:
+        if ring != 'stage':
+            ring = int(ring)
+
+        # Get the current day of the week if 'day' is not provided
+        current_day = datetime.now().strftime('%A')
+
+        # Check if the day is Saturday
+        if current_day.lower() == "saturday":
+            day = "saturday"
+        
+
+        params={
+            'day': day,
+            'ring': ring
+        }
+        start_time = requests.get(os.environ.get('RING_ENDPOINT'), params=params).text
+        return f"""
+        The following start time was identified. if the start time was not found, let the user know. 
+        Please reiterate the day and time in your response. Use the words Friday or Saturday explicitly and make sure to include am or pm
+        {start_time}
+        """
+
+    except ValueError:
+        return "I'm sorry, I could not find the ring number you specified."
+
+
 def get_all_divisions():
     division_data = requests.get(os.environ.get('DIVISIONS_ENDPOINT')).text
     return pd.read_json(StringIO(division_data))
-
-# def create_division_index(index_dir: str, divisions_df: pd.DataFrame):
-#     if not os.path.exists(index_dir):
-#         os.mkdir(index_dir)
-#         schema = Schema(
-#             name=TEXT(stored=True),
-#             division_code=ID(stored=True),
-#             time=STORED(),
-#             day=STORED(),
-#             ring=STORED(),
-#         )
-#         ix = create_in(index_dir, schema)
-#     else:
-#         ix = open_dir(index_dir)
-
-#     writer = ix.writer()
-    
-#     for _, row in divisions_df.iterrows():
-#         writer.add_document(
-#             name=row['name'].lower(),  # Lowercase for case-insensitive search
-#             time=row['time'],
-#             day=row['day'],
-#             ring=row['ring'],
-#             division_code=str(row['division_code'])  # Assuming there's an 'id' column for unique identification
-#         )
-#     writer.commit()
-
-#     return ix
-
-
-# def get_division_info_and_time_by_keywords(division_query_phrase: str):
-#     if 'cmx' in division_query_phrase.lower():
-#         return "please let the user know they have to specify which division, creative, muscial or extreme"
-
-#     if 'trad' in division_query_phrase.lower():
-#         division_query_phrase = division_query_phrase.replace(' trad ', ' traditional ')
-
-#     ix = create_division_index(
-#         "division_indexdir",
-#         (
-#             get_all_divisions()
-#             .assign(
-#                 name = lambda df_: df_.name.str.replace('Class AA', '', regex = False)
-#             )
-#         )
-#     )
-    
-#     relevant_divisions = []
-
-#     with ix.searcher() as searcher:
-#         query = QueryParser("name", ix.schema).parse(division_query_phrase.lower())
-#         results = searcher.search(query, limit=5)
-#         print(results)
-
-#         for result in results:
-#             relevant_divisions.append({
-#                 "division_code": result["division_code"],
-#                 "name": result["name"],
-#                 "time" : result['time'],
-#                 "day": result['day'],
-#                 "ring": result['ring']
-#             })
-
-#     if not relevant_divisions:
-#         return "No divisions found matching the provided query."
-
-#     # Convert the relevant divisions to JSON
-#     relevant_divisions_json = pd.DataFrame(relevant_divisions).to_json(orient='records')
-
-#     return f'''
-#     The following divisions were found to be closest to what the user requested: 
-#     {relevant_divisions_json}.
-#     Please provide them with the day, time, and ring number associated with the division closest to what they originally requested.
-#     Remind them the times are estimated and may change based on completion of prior divisions. If they did not provide all fields,
-#     let them know you can provide better results if they provide further detail.
-#     '''
 
 ix = None
 
@@ -618,6 +570,28 @@ def run_conversation(messages):
                 },
             }
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_ring_start_time",
+                "description": "Gets the starting time for a particular ring.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ring": {
+                            "type": "string",
+                            "description": "Ring should be a number unless the ring is 'stage'.",
+                        },
+                        "day": {
+                            "type": "string",
+                            "description": "The day that the ring starts on. Should only be friday or saturday",
+                        },
+                    },
+                    "required": ["keyword"],
+                },
+            }
+        },
+        
     ]
     current_messages = [m for m in messages]
     last_message = current_messages[-1]['content']
@@ -635,7 +609,7 @@ def run_conversation(messages):
         tools=tools,
         tool_choice="auto",  # auto is default, but we'll be explicit        
         stream = True,
-        temperature=.2
+        temperature=.1
     )
 
     tool_resp = ''
@@ -676,7 +650,9 @@ def run_conversation(messages):
             'get_division_info_and_time_by_keywords': get_division_info_and_time_by_keywords,
             'get_division_info_and_time_by_code': get_division_info_and_time_by_code,
             "get_referee_dress_code": get_referee_dress_code,
-            'get_judging_or_scorekeeper_assignment': get_judging_or_scorekeeper_assignment
+            'get_judging_or_scorekeeper_assignment': get_judging_or_scorekeeper_assignment,
+            "get_ring_start_time": get_ring_start_time,
+            '{functions.get_ring_start_time}': get_ring_start_time
         }
 
         function_to_call = available_functions[function_name]
@@ -691,15 +667,22 @@ def run_conversation(messages):
         elif function_name == 'get_division_info_and_time_by_keywords':
             function_response = function_to_call(
                 division_query_phrase = function_args.get("division_query_phrase"),
-                # age_keyword = function_args.get("age_keyword"),
-                # gender_key_word = function_args.get("gender_key_word"),
-                # rank_key_word = function_args.get("rank_key_word"),
-                # division_key_word = function_args.get("division_key_word"),
             )
         elif function_name == 'get_division_info_and_time_by_code':
             function_response = function_to_call(
                 division_code = function_args.get("division_code"),
             )
+
+        elif function_name == 'get_ring_start_time':
+            if 'day' in function_args:
+                function_response = function_to_call(
+                    ring = function_args.get("ring"),
+                    day = function_args.get("day"),
+                )
+            else:
+                function_response = function_to_call(
+                    ring = function_args.get("ring"),
+                )
         else:
             function_response = function_to_call()
 
@@ -717,7 +700,7 @@ def run_conversation(messages):
             model="gpt-4o-mini",
             messages=current_messages,
             stream = True,
-            temperature=.2
+            temperature=.1
         )  # get a new response from the model where it can see the function response
 
         if special_command:
@@ -793,9 +776,9 @@ def main_app(session_date):
             try:
                 response_output = st.write_stream(response)
             except Exception as e:
-                print(e)
+                print(traceback.format_exc())
                 response_output = st.write('Oops, I encountered an internal error, can you ask your question again?')
-                response_output = 'Oops, I encountered an internal error, can you ask your question again?'
+                response_output = 'Oops, I encountered an internal error, please refresh and ask your question again.'
             append_message_to_worksheet(st.session_state.worksheet_name, st.session_state.session_date, st.session_state.session_count, prompt, str(response_output))
 
             st.session_state.messages.append({"role": "assistant", "content": response_output})
