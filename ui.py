@@ -235,6 +235,9 @@ def get_division_info_and_time_by_keywords(division_query_phrase: str):
     global ix  # Use the global variable for the index
 
     division_query_phrase = division_query_phrase.lower()
+    if 'korean challenge' in division_query_phrase:
+        division_query_phrase = division_query_phrase.replace('and under', '')
+
     if 'cmx' in division_query_phrase:
         return "please let the user know they have to specify which division, creative, musical or extreme"
 
@@ -320,8 +323,10 @@ def get_division_info_and_time_by_code(
     {division}
     '''
 
-def get_korean_challenge_rules():
-    return json.dumps({'info': '''
+def get_ruleset_for_korean_challenge():
+    relevant_start_times = get_division_info_and_time_by_keywords('korean challenge')
+    return json.dumps({'info': f'''
+        Below are the rules for korean challenge. also provide the start times: {relevant_start_times}
         The intent of the Traditional Divisions for TKD is to promote growth in the division's with the use of accepted traditional Korean forms only. No “Dojo” forms or patterns, only recognized patterns with a demonstrated history in regulated organizations that administer Korean forms.
 
         Divisions Offered
@@ -527,7 +532,7 @@ def run_conversation(messages):
         {
             "type": "function",
             "function": {
-                "name": "get_korean_challenge_rules",
+                "name": "get_ruleset_for_korean_challenge",
                 "description": "Get the ruleset for the korean challenge",
                 "parameters": {
                     "type": "object",
@@ -657,7 +662,7 @@ def run_conversation(messages):
             "get_rules": get_rules,
             "get_overall_weekend_schedule_and_location": get_overall_weekend_schedule_and_location,
             'get_registration_times_and_locations': get_registration_times_and_locations,
-            'get_korean_challenge_rules': get_korean_challenge_rules,
+            'get_ruleset_for_korean_challenge': get_ruleset_for_korean_challenge,
             'get_promoters': get_promoters,
             "get_developer_info" : get_developer_info,
             'get_division_info_and_time_by_keywords': get_division_info_and_time_by_keywords,
