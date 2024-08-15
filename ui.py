@@ -13,6 +13,12 @@ from sheet import sheet
 from io import StringIO
 import re
 from typing import List 
+# import shutil
+
+from whoosh.index import create_in, open_dir
+from whoosh.fields import Schema, TEXT, ID, STORED
+from whoosh.qparser import QueryParser
+from whoosh import writing
 
 st.set_page_config(page_title = 'AmerikickGPT')
 hide_github_icon = """<style>
@@ -162,46 +168,186 @@ def get_all_divisions():
     division_data = requests.get(os.environ.get('DIVISIONS_ENDPOINT')).text
     return pd.read_json(StringIO(division_data))
 
-def get_division_info_and_time_by_keywords(
-    division_query_phrase: str = '',
-    age_keyword: str = '',
-    gender_key_word: str = '',
-    rank_key_word: str = '', 
-    division_key_word: str = ''
-):
-    if not division_key_word:
-        division_key_word = ''
+# def create_division_index(index_dir: str, divisions_df: pd.DataFrame):
+#     if not os.path.exists(index_dir):
+#         os.mkdir(index_dir)
+#         schema = Schema(
+#             name=TEXT(stored=True),
+#             division_code=ID(stored=True),
+#             time=STORED(),
+#             day=STORED(),
+#             ring=STORED(),
+#         )
+#         ix = create_in(index_dir, schema)
+#     else:
+#         ix = open_dir(index_dir)
 
-    if not age_keyword:
-        age_keyword = ''
-
-    if not gender_key_word:
-        gender_key_word = ''
-
-    if not rank_key_word:
-        rank_key_word = ''
-
-    shortlist = (
-        get_all_divisions()
-        .loc[lambda row: 
-            (row.name.str.lower().str.contains(age_keyword)) & 
-            (row.name.str.lower().str.contains(gender_key_word)) & 
-            (row.name.str.lower().str.contains(division_key_word)) &
-            (row.name.str.lower().str.contains(rank_key_word))
-        ]
-    )
-    relevant_divisions = (
-        shortlist
-        .loc[lambda row: row.name.isin([r[0] for r in process.extract(division_query_phrase, shortlist.name.to_list(), limit=5)])]
-        .to_json(orient = 'records')
-    )
+#     writer = ix.writer()
     
+#     for _, row in divisions_df.iterrows():
+#         writer.add_document(
+#             name=row['name'].lower(),  # Lowercase for case-insensitive search
+#             time=row['time'],
+#             day=row['day'],
+#             ring=row['ring'],
+#             division_code=str(row['division_code'])  # Assuming there's an 'id' column for unique identification
+#         )
+#     writer.commit()
+
+#     return ix
+
+
+# def get_division_info_and_time_by_keywords(division_query_phrase: str):
+#     if 'cmx' in division_query_phrase.lower():
+#         return "please let the user know they have to specify which division, creative, muscial or extreme"
+
+#     if 'trad' in division_query_phrase.lower():
+#         division_query_phrase = division_query_phrase.replace(' trad ', ' traditional ')
+
+#     ix = create_division_index(
+#         "division_indexdir",
+#         (
+#             get_all_divisions()
+#             .assign(
+#                 name = lambda df_: df_.name.str.replace('Class AA', '', regex = False)
+#             )
+#         )
+#     )
+    
+#     relevant_divisions = []
+
+#     with ix.searcher() as searcher:
+#         query = QueryParser("name", ix.schema).parse(division_query_phrase.lower())
+#         results = searcher.search(query, limit=5)
+#         print(results)
+
+#         for result in results:
+#             relevant_divisions.append({
+#                 "division_code": result["division_code"],
+#                 "name": result["name"],
+#                 "time" : result['time'],
+#                 "day": result['day'],
+#                 "ring": result['ring']
+#             })
+
+#     if not relevant_divisions:
+#         return "No divisions found matching the provided query."
+
+#     # Convert the relevant divisions to JSON
+#     relevant_divisions_json = pd.DataFrame(relevant_divisions).to_json(orient='records')
+
+#     return f'''
+#     The following divisions were found to be closest to what the user requested: 
+#     {relevant_divisions_json}.
+#     Please provide them with the day, time, and ring number associated with the division closest to what they originally requested.
+#     Remind them the times are estimated and may change based on completion of prior divisions. If they did not provide all fields,
+#     let them know you can provide better results if they provide further detail.
+#     '''
+
+ix = None
+
+def create_division_index(index_dir: str, divisions_df: pd.DataFrame):
+    if not os.path.exists(index_dir):
+        os.mkdir(index_dir)
+        schema = Schema(
+            name=TEXT(stored=True),
+            division_code=ID(stored=True),
+            time=STORED(),
+            day=STORED(),
+            ring=STORED(),
+        )
+        ix = create_in(index_dir, schema)
+    else:
+        ix = open_dir(index_dir)
+
+    writer = ix.writer()
+    
+    for _, row in divisions_df.iterrows():
+        writer.add_document(
+            name=row['name'].lower(),  # Lowercase for case-insensitive search
+            time=row['time'],
+            day=row['day'],
+            ring=row['ring'],
+            division_code=str(row['division_code'])  # Assuming there's an 'id' column for unique identification
+        )
+    writer.commit(mergetype=writing.CLEAR)
+
+    return ix
+
+def get_division_info_and_time_by_keywords(division_query_phrase: str):
+    global ix  # Use the global variable for the index
+
+    division_query_phrase = division_query_phrase.lower()
+    if 'cmx' in division_query_phrase:
+        return "please let the user know they have to specify which division, creative, musical or extreme"
+
+    if 'trad' in division_query_phrase:
+        division_query_phrase = division_query_phrase.replace(' trad ', ' traditional ')
+
+    if 'fighting' in division_query_phrase:
+        division_query_phrase = division_query_phrase.replace('fighting', 'sparring')
+       
+    if 'continuous' in division_query_phrase:
+        division_query_phrase = division_query_phrase.replace('sparring', '')
+        division_query_phrase = division_query_phrase.replace("'", '')
+        division_query_phrase = division_query_phrase.replace('boys', '')
+        division_query_phrase = division_query_phrase.replace('girls', '')
+        division_query_phrase = division_query_phrase.replace('womens', '18 & Over')
+        division_query_phrase = division_query_phrase.replace('mens', '18 & Over')
+
+    if 'sync' in division_query_phrase and 'synchronized' not in division_query_phrase:
+        division_query_phrase = division_query_phrase.replace('sync', ' synchronized ')
+
+    if 'womens' in division_query_phrase or "women's" in division_query_phrase:
+        division_query_phrase = division_query_phrase.replace('womens ', 'women ').replace("women's ", ' women ')
+    
+    elif 'mens' in division_query_phrase or "men's" in division_query_phrase:
+        division_query_phrase = division_query_phrase.replace('mens ', ' men ').replace("men's ", ' men ').replace(' mens ', ' men ').replace(" men's ", ' men ').replace(' mens', ' men').replace(" men's", ' men')
+
+    print('query phrase below')
+    print(division_query_phrase)
+    # Create the index on-demand
+    if ix is None:
+        ix = create_division_index(
+            "division_indexdir",
+            (
+                get_all_divisions()
+                .assign(
+                    name = lambda df_: df_.name.str.replace('Class AA', '', regex = False)
+                )
+                .fillna('unknown')
+            )
+        )
+    
+    relevant_divisions = []
+
+    with ix.searcher() as searcher:
+        query = QueryParser("name", ix.schema).parse(division_query_phrase)
+        results = searcher.search(query, limit=7)
+
+        for result in results:
+            relevant_divisions.append({
+                "division_code": result["division_code"],
+                "name": result["name"],
+                "time" : result['time'],
+                "day": result['day'],
+                "ring": result['ring']
+            })
+
+    if not relevant_divisions:
+        return "No divisions found matching the provided query."
+
+    # Convert the relevant divisions to JSON
+    relevant_divisions_json = pd.DataFrame(relevant_divisions).to_json(orient='records')
+    print(relevant_divisions_json)
+
     return f'''
-    the following divisions were found to be closest to what the user requested. 
-    please provide them with the day, time, and ring number associated with the division closest to what they originally requested.
-    remind them the times are estimated and may change based on completion of prior divisions. if they did not provide all fields,
-    let them know you can provide better results if they provide further detail. if there are no divisions that match the code, let the user know you were not able to find it:
-    {relevant_divisions}
+    The following divisions were found to be closest to what the user requested: 
+    {relevant_divisions_json}.
+    Please provide them with the day, time, and ring number associated with the division closest to what they originally requested.
+    If there are several divisions that are very, very similar, then provide information for all of those divisions.
+    Remind them the times are estimated and may change based on completion of prior divisions. If they did not provide all fields,
+    let them know you can provide better results if they provide further detail.
     '''
 
 def get_division_info_and_time_by_code(
@@ -337,7 +483,7 @@ def run_conversation(messages):
             "type": "function",
             "function": {
                 "name": "get_division_info_and_time_by_code",
-                "description": "Uses divison code to identify division and provide details",
+                "description": "Uses divison code to identify division and provide details. division codes will contain both letters and numbers. do not confuse an age range with a division code for example 14-17 is not a division code",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -354,29 +500,13 @@ def run_conversation(messages):
             "type": "function",
             "function": {
                 "name": "get_division_info_and_time_by_keywords",
-                "description": "Uses key words to pair down possible divisions and then uses cosine similarity to find the top 5 relevant matches.",
+                "description": "Uses key words from division phrase to find closest matches.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "division_query_phrase": {
                             "type": "string",
                             "description": "This is the phrase the user provides to identify the division. May be something like '10-11 boys black belt sparring'",
-                        },
-                        "age_keyword": {
-                            "type": "string",
-                            "description": "A particular number denoting one of the ages of the participants. Should be a singular number like 10, 11, 18, or 30 but could be others.",
-                        },
-                        "gender_key_word": {
-                            "type": "string",
-                            "description": "A particular gender like boys, girls, men, women. if multiple genders are specified search along one",
-                        },
-                        "rank_key_word": {
-                            "type": "string",
-                            "description": "Denotes the rank of the division of competition. Something like black, intermediate, advanced, or beginner",
-                        },
-                        "rank_key_word": {
-                            "type": "string",
-                            "description": "Denotes type of division, like sparring, forms, traditional forms, traditional challenge, korean challenge, traditional weapons, cretive weapons, extreme weapons, team sync, demo, etc",
                         },
                     },
                     "required": ["division_query_phrase"],
@@ -505,7 +635,7 @@ def run_conversation(messages):
         tools=tools,
         tool_choice="auto",  # auto is default, but we'll be explicit        
         stream = True,
-        temperature=0
+        temperature=.2
     )
 
     tool_resp = ''
@@ -561,10 +691,10 @@ def run_conversation(messages):
         elif function_name == 'get_division_info_and_time_by_keywords':
             function_response = function_to_call(
                 division_query_phrase = function_args.get("division_query_phrase"),
-                age_keyword = function_args.get("age_keyword"),
-                gender_key_word = function_args.get("gender_key_word"),
-                rank_key_word = function_args.get("rank_key_word"),
-                division_key_word = function_args.get("division_key_word"),
+                # age_keyword = function_args.get("age_keyword"),
+                # gender_key_word = function_args.get("gender_key_word"),
+                # rank_key_word = function_args.get("rank_key_word"),
+                # division_key_word = function_args.get("division_key_word"),
             )
         elif function_name == 'get_division_info_and_time_by_code':
             function_response = function_to_call(
@@ -587,7 +717,7 @@ def run_conversation(messages):
             model="gpt-4o-mini",
             messages=current_messages,
             stream = True,
-            temperature=0
+            temperature=.2
         )  # get a new response from the model where it can see the function response
 
         if special_command:
@@ -660,7 +790,12 @@ def main_app(session_date):
 
         # Display assistant message in chat message container
         with st.chat_message("assistant"):
-            response_output = st.write_stream(response)
+            try:
+                response_output = st.write_stream(response)
+            except Exception as e:
+                print(e)
+                response_output = st.write('Oops, I encountered an internal error, can you ask your question again?')
+                response_output = 'Oops, I encountered an internal error, can you ask your question again?'
             append_message_to_worksheet(st.session_state.worksheet_name, st.session_state.session_date, st.session_state.session_count, prompt, str(response_output))
 
             st.session_state.messages.append({"role": "assistant", "content": response_output})
