@@ -51,6 +51,11 @@ def get_referee_dress_code():
     Please also provide the following quote from Sensei Bob Leiker: "Pretty simple dress code, dress accordingly"
     '''
 
+def get_event_map():
+    return '''
+    provide the user with the following clickable link https://storage.googleapis.com/naska_rules/event_map.jpg
+    '''
+
 def get_rules():
     try:
         reader = PdfReader("output.pdf")
@@ -588,7 +593,18 @@ def run_conversation(messages):
                 },
             }
         },
-        
+        {
+            "type": "function",
+            "function": {
+                "name": "get_event_map",
+                "description": "Provides a map of the event.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
     ]
     current_messages = [m for m in messages]
     last_message = current_messages[-1]['content']
@@ -649,7 +665,8 @@ def run_conversation(messages):
             "get_referee_dress_code": get_referee_dress_code,
             'get_judging_or_scorekeeper_assignment': get_judging_or_scorekeeper_assignment,
             "get_ring_start_time": get_ring_start_time,
-            '{functions.get_ring_start_time}': get_ring_start_time
+            '{functions.get_ring_start_time}': get_ring_start_time,
+            "get_event_map": get_event_map
         }
 
         function_to_call = available_functions[function_name]
