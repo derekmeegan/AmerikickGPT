@@ -641,6 +641,42 @@ def run_conversation(messages):
                 },
             }
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_tournament_address",
+                "description": "Provides the address for the tournament.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_tournament_website",
+                "description": "Provides the website for the tournament.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_parking_information",
+                "description": "Provides parking information for the tournament.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
     ]
     current_messages = [m for m in messages]
     last_message = current_messages[-1]['content']
@@ -702,7 +738,10 @@ def run_conversation(messages):
             'get_judging_or_scorekeeper_assignment': get_judging_or_scorekeeper_assignment,
             "get_ring_start_time": get_ring_start_time,
             '{functions.get_ring_start_time}': get_ring_start_time,
-            "get_event_map": get_event_map
+            "get_event_map": get_event_map,
+            "get_parking_information": get_parking_information,
+            "get_tournament_website": get_tournament_website,
+            "get_tournament_address": get_tournament_address
         }
 
         function_to_call = available_functions[function_name]
