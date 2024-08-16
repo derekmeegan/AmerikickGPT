@@ -106,7 +106,7 @@ def get_dragonism():
         'hungry dogs run fast',
         'push',
         'sick nasty',
-
+        "its just big me",
     ]
 
 def get_tournament_website():
@@ -902,6 +902,7 @@ def email_input_screen():
         st.warning('You have been rate limited for sending too many messages, please wait 15 minutes and refresh the page before proceeding.', icon="⚠️")
     
     email = st.text_input("Enter your email to proceed:")
+    email = email.lower()
     
     if st.button("Submit"):
         if email and email in st.session_state.valid_emails:
@@ -914,7 +915,7 @@ def email_input_screen():
             st.error("Invalid email. Please try again.")
 
 if 'valid_emails' not in st.session_state:
-    st.session_state.valid_emails = sheet.worksheet("users").col_values(1)[1:]
+    st.session_state.valid_emails = [x.lower() for x in sheet.worksheet("users").col_values(1)[1:]]
 
 if 'email_verified' not in st.session_state:
     st.session_state.email_verified = False
