@@ -160,6 +160,9 @@ def get_promoters():
         markrusso@amerikick.com
     '''
 
+def get_musical_rule():
+    return '''Competitors in any NASKA rated musical division must have 75% choreography with their music. While this rule is currently not in the NASKA rule book it is a rule for the tournament and league.'''
+
 def get_registration_times_and_locations():
     registration_data = (
         pd.read_json(get_overall_weekend_schedule_and_location())
@@ -679,6 +682,18 @@ def run_conversation(messages):
                 },
             }
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_musical_rule",
+                "description": "Provides musicality rules for NASKA rated musical forms or weapons.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                    },
+                },
+            }
+        },
     ]
     current_messages = [m for m in messages]
     last_message = current_messages[-1]['content']
@@ -743,7 +758,8 @@ def run_conversation(messages):
             "get_event_map": get_event_map,
             "get_parking_information": get_parking_information,
             "get_tournament_website": get_tournament_website,
-            "get_tournament_address": get_tournament_address
+            "get_tournament_address": get_tournament_address,
+            "get_musical_rule": get_musical_rule
         }
 
         function_to_call = available_functions[function_name]
