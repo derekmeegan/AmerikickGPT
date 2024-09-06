@@ -99,16 +99,7 @@ def get_judging_or_scorekeeper_assignment():
     the users judging or scorekeeper asignment is as the following. they could be either be a judge or scorekeeper so just say it is their assignment.
     {result}
     '''
-
-def get_dragonism():
-    dragonisms = [
-        'skibidi',
-        'hungry dogs run fast',
-        'push',
-        'sick nasty',
-        "its just big me",
-    ]
-
+    
 def get_tournament_website():
     return "Provide the following clickable link: https://amerikickinternationals.com/"
 
